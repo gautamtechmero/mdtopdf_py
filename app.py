@@ -189,6 +189,14 @@ page_bg = meta["page_bg"]
 outer_bg = meta["outer_bg"]
 text_color = meta["text_color"]
 
+# Map margin values for layout synchronization
+margin_vals = {
+    "narrow": "0.6cm",
+    "normal": "1.2cm",
+    "wide": "2.0cm"
+}
+margin_str = margin_vals.get(margins, "1.2cm")
+
 # Compile standalone HTML doc for Preview (Paper Sheet style, responsive)
 preview_html = f"""<!DOCTYPE html>
 <html>
@@ -202,7 +210,7 @@ preview_html = f"""<!DOCTYPE html>
         html, body {{
             background-color: {outer_bg} !important;
             margin: 0 !important;
-            padding: 15px !important;
+            padding: 10px !important;
             display: flex;
             justify-content: center;
             box-sizing: border-box;
@@ -213,7 +221,7 @@ preview_html = f"""<!DOCTYPE html>
             color: {text_color} !important;
             box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
             border: 1px solid rgba(0, 0, 0, 0.08);
-            padding: 1.5cm;
+            padding: {margin_str}; /* Synchronize preview margins with selected setting */
             width: 100%;
             max-width: 800px;
             min-height: 1050px; /* A4 aspect ratio representation */
@@ -264,14 +272,6 @@ preview_html = f"""<!DOCTYPE html>
 """
 
 # Compile standard HTML doc for PDF compiler (without outer borders, using real print styling)
-# Map margins for CSS @page rule
-margin_vals = {
-    "narrow": "0.6cm",
-    "normal": "1.2cm",
-    "wide": "2.0cm"
-}
-margin_str = margin_vals.get(margins, "1.2cm")
-
 # Determine CSS page size configuration
 size_css = page_size
 if orientation == 'landscape':
@@ -317,8 +317,8 @@ pdf_html = f"""<!DOCTYPE html>
         body {{
             word-wrap: break-word;
             font-size: {font_size} !important;
-            padding-top: 0 !important; /* Strip default body top padding in PDF */
-            margin-top: 0 !important;
+            padding: 0 !important; /* Strip all default body padding in PDF */
+            margin: 0 !important;
         }}
         
         /* Strip top margin on the first header in the PDF page */
