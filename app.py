@@ -155,9 +155,10 @@ with col_settings:
     with col_theme:
         theme_options = list(styles.THEME_BASES.keys())
         selected_theme = st.selectbox("Style Theme", theme_options, index=0)
-        page_size = st.selectbox("Page Size", ["A4", "Letter", "Legal", "A3", "A5"], index=0)
+        font_size = st.selectbox("Font Size", ["11px", "12px", "13px", "14px", "15px", "16px"], index=3) # Defaults to 14px
         
     with col_params:
+        page_size = st.selectbox("Page Size", ["A4", "Letter", "Legal", "A3", "A5"], index=0)
         orientation = st.radio("Orientation", ["Portrait", "Landscape"], index=0).lower()
         margins = st.select_slider("Margins", options=["narrow", "normal", "wide"], value="normal")
 
@@ -221,10 +222,11 @@ preview_html = f"""<!DOCTYPE html>
             text-align: left;
         }}
         
-        /* Force body rules to apply nicely inside the container instead */
+        /* Force font size and body rules to apply nicely inside the container */
         body {{
             padding: 0 !important;
             background: transparent !important;
+            font-size: {font_size} !important;
         }}
         
         /* Responsive table wrapping */
@@ -270,6 +272,7 @@ pdf_html = f"""<!DOCTYPE html>
         }}
         body {{
             word-wrap: break-word;
+            font-size: {font_size} !important;
         }}
         
         /* Ensure table text wraps correctly in the printed PDF */
