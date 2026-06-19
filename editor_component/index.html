@@ -419,16 +419,8 @@
             lineNumbers.innerHTML = numbersHtml;
         }
 
-        // Setup custom Marked.js renderer to handle specific requirements
-        const renderer = new marked.Renderer();
-        
-        // Ensure tables are responsive in preview
-        renderer.table = function(header, body) {
-            return `<table class="preview-table">\n<thead>\n${header}</thead>\n<tbody>\n${body}</tbody>\n</table>\n`;
-        };
-
+        // Use default Marked.js renderer which parses GFM tables correctly
         marked.setOptions({
-            renderer: renderer,
             gfm: true,
             breaks: true,
             headerIds: false
@@ -580,6 +572,7 @@
         // Listen for layout settings changes and initial text from Python
         Streamlit.events.addEventListener(Streamlit.RENDER_EVENT, (event) => {
             const { args } = event.detail;
+            console.log("DEBUG JS: Received RENDER EVENT. args =", JSON.stringify(args), "currentValueId =", currentValueId);
             if (!args) return;
 
             // 1. Check for incoming text updates (from file uploads, reset buttons, etc.)

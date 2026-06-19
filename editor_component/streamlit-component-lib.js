@@ -49,17 +49,15 @@
     events: {
       addEventListener: function(type, callback) {
         window.addEventListener("message", function(event) {
-          if (event.data && event.data.isStreamlitMessage) {
-            if (event.data.type === "streamlit:render") {
-              // Wrap detail structure to match standard CustomEvent format
-              callback({
-                detail: {
-                  args: event.data.args,
-                  disabled: event.data.disabled,
-                  theme: event.data.theme
-                }
-              });
-            }
+          if (event.data && event.data.type === "streamlit:render") {
+            // Wrap detail structure to match standard CustomEvent format
+            callback({
+              detail: {
+                args: event.data.args,
+                disabled: event.data.disabled,
+                theme: event.data.theme
+              }
+            });
           }
         });
       }
