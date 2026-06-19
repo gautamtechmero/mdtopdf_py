@@ -259,23 +259,56 @@ preview_html = f"""<!DOCTYPE html>
 """
 
 # Compile standard HTML doc for PDF compiler (without outer borders, using real print styling)
+# Map margins for CSS @page rule
+margin_vals = {
+    "narrow": "0.6cm",
+    "normal": "1.2cm",
+    "wide": "2.0cm"
+}
+margin_str = margin_vals.get(margins, "1.2cm")
+
+# Determine CSS page size configuration
+size_css = page_size
+if orientation == 'landscape':
+    size_css = f"{page_size} landscape"
+
 pdf_html = f"""<!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8">
     <title>Exported PDF</title>
     <style>
+        /* Force paper size and print margins in the CSS layout context */
+        @page {{
+            size: {size_css};
+            margin: {margin_str};
+        }}
+        
         {theme_css}
         
-        /* standard print page-breaks and wrapping */
+        /* standard print page-breaks */
         .page-break {{
             page-break-before: always;
             break-before: page;
         }}
-        pre, blockquote, table, tr {{
-            page-break-inside: avoid;
-            break-inside: avoid;
+        
+        /* Smart page breaks - prevent orphan headings and list/table row splits */
+        h1, h2, h3, h4, h5, h6 {{
+            page-break-after: avoid !important;
+            break-after: avoid !important;
         }}
+        
+        pre, blockquote, table, tr, li {{
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+        }}
+        
+        p {{
+            word-wrap: break-word;
+            orphans: 3 !important;
+            widows: 3 !important;
+        }}
+        
         body {{
             word-wrap: break-word;
             font-size: {font_size} !important;
