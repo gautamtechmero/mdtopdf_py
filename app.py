@@ -8,11 +8,6 @@ import sys
 # Import local stylesheet generator
 import styles
 
-# Declare custom workspace component
-parent_dir = os.path.dirname(os.path.abspath(__file__))
-component_dir = os.path.join(parent_dir, "editor_component")
-markdown_workspace = components.declare_component("markdown_workspace", path=component_dir)
-
 # Page setup
 st.set_page_config(
     page_title="Markdown to PDF Converter Pro",
@@ -393,24 +388,15 @@ with st.container(border=True):
 
 st.markdown("---")
 
-# RENDER CUSTOM WORKSPACE COMPONENT (Unified Editor & Preview)
-theme_css = styles.get_theme_css(selected_theme, pdf_mode=False)
-
-returned_text = markdown_workspace(
-    initial_value=st.session_state.markdown_editor_area,
-    theme_css=theme_css,
-    page_size=page_size,
-    orientation=orientation,
-    margins=margins,
-    font_size=font_size,
-    height=800,
-    key="workspace_editor_preview"
+# RENDER NATIVE FULL-WIDTH MARKDOWN EDITOR
+st.markdown("### ✍️ Markdown Editor")
+st.text_area(
+    "Write your markdown here:",
+    key="markdown_editor_area",
+    height=550,
+    label_visibility="collapsed",
+    placeholder="Type or paste your Markdown here..."
 )
-
-# If the text was changed inside Javascript and returned to Streamlit, update state and rerun
-if returned_text is not None and returned_text != st.session_state.markdown_editor_area:
-    st.session_state.markdown_editor_area = returned_text
-    st.rerun()
 
 # FOOTER REFERENCE GUIDE
 with st.expander("📖 PDF Layout & Page Breaks Guide", expanded=False):
