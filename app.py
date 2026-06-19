@@ -210,22 +210,24 @@ def generate_pdf_bytes(html_content, page_size, orientation, margins):
     
     with sync_playwright() as p:
         try:
-            browser = p.chromium.launch(headless=True)
+            browser = p.chromium.launch(
+                headless=True,
+                args=['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+            )
         except Exception as e:
             err_msg = str(e)
-            if "Executable doesn't exist" in err_msg or "playwright install" in err_msg.lower() or "looks like playwright was just installed" in err_msg.lower():
-                # Let user know in Streamlit UI we are downloading
-                st.info("Playwright Chromium browser not found. Automatically installing Chromium browser (this may take a minute)...")
-                try:
-                    # Run install command
-                    subprocess.run([sys.executable, "-m", "playwright", "install", "chromium"], check=True)
-                    st.success("Chromium installed successfully! Continuing PDF compilation...")
-                    # Retry launching
-                    browser = p.chromium.launch(headless=True)
-                except Exception as install_err:
-                    raise RuntimeError(f"Failed to auto-install Playwright Chromium: {install_err}") from install_err
-            else:
-                raise
+            st.info("Playwright Chromium launch failed or browser not found. Automatically installing/verifying Chromium (this may take a minute)...")
+            try:
+                # Run install command
+                subprocess.run([sys.executable, "-m", "playwright", "install", "chromium"], check=True)
+                st.success("Chromium installed successfully! Continuing PDF compilation...")
+                # Retry launching
+                browser = p.chromium.launch(
+                    headless=True,
+                    args=['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+                )
+            except Exception as install_err:
+                raise RuntimeError(f"Failed to launch/install Playwright Chromium: {install_err}. Original launch error: {err_msg}") from install_err
         
         page = browser.new_page()
         page.set_content(html_content)
