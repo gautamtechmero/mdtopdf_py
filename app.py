@@ -15,7 +15,7 @@ markdown_workspace = components.declare_component("markdown_workspace", path=com
 
 # Page setup
 st.set_page_config(
-    page_title="Markdown to PDF Converter Pro",
+    page_title="Markdown to PDF Converter",
     page_icon="📝",
     layout="wide",
     initial_sidebar_state="collapsed"
