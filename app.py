@@ -244,7 +244,10 @@ preview_html = f"""<!DOCTYPE html>
             margin-bottom: 1rem !important;
         }}
         table td, table th {{
-            word-break: break-word !important;
+            word-break: normal !important;
+            word-wrap: break-word !important;
+            overflow-wrap: break-word !important;
+            min-width: 80px !important;
         }}
         img {{
             max-width: 100% !important;
@@ -332,7 +335,10 @@ pdf_html = f"""<!DOCTYPE html>
             border-collapse: collapse !important;
         }}
         table td, table th {{
-            word-break: break-word !important;
+            word-break: normal !important;
+            word-wrap: break-word !important;
+            overflow-wrap: break-word !important;
+            min-width: 80px !important;
         }}
         img {{
             max-width: 100% !important;
