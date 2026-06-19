@@ -235,10 +235,13 @@ preview_html = f"""<!DOCTYPE html>
             padding-top: 0 !important;
         }}
         
-        /* Responsive table wrapping */
+        /* Responsive table wrapping & auto-width */
         table {{
-            width: 100% !important;
+            width: auto !important;
+            max-width: 100% !important;
             table-layout: auto !important;
+            border-collapse: collapse !important;
+            margin-bottom: 1rem !important;
         }}
         table td, table th {{
             word-break: break-word !important;
@@ -322,11 +325,12 @@ pdf_html = f"""<!DOCTYPE html>
             padding-top: 0 !important;
         }}
         
-        /* Ensure table text wraps correctly in the printed PDF */
+        /* Ensure table is auto-width and responsive in the printed PDF */
         table {{
-            width: 100% !important;
+            width: auto !important;
+            max-width: 100% !important;
             table-layout: auto !important;
-            border-collapse: collapse;
+            border-collapse: collapse !important;
         }}
         table td, table th {{
             word-break: break-word !important;
