@@ -140,7 +140,7 @@ md_text = st.session_state.markdown_editor_area
 # Generate HTML body from markdown
 try:
     if not md_text.strip():
-        html_body = ""
+        html_body = "<p style='color: #94a3b8; font-style: italic;'>Your rendered PDF preview will appear here...</p>"
     else:
         html_body = markdown.markdown(
             md_text,
@@ -153,7 +153,22 @@ except Exception as e:
 # Retrieve appropriate CSS theme styles
 theme_css = styles.get_theme_css(selected_theme, pdf_mode=False)
 
-# Compile standalone HTML doc for PDF renderer
+# Compile standalone HTML doc for Preview & PDF renderer
+preview_html = f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Markdown Preview</title>
+    <style>
+        {theme_css}
+    </style>
+</head>
+<body>
+    {html_body}
+</body>
+</html>
+"""
+
 pdf_html = f"""<!DOCTYPE html>
 <html>
 <head>
@@ -211,15 +226,22 @@ else:
 
 st.markdown("---")
 
-# MAIN EDITOR WORKSPACE (Full Width)
-st.markdown("### ✍️ Markdown Editor")
-st.text_area(
-    "Write your markdown here:",
-    key="markdown_editor_area",
-    height=600,
-    label_visibility="collapsed",
-    placeholder="Type or paste your Markdown here..."
-)
+# MAIN EDITOR & PREVIEW WORKSPACE
+col_editor, col_preview = st.columns([1, 1])
+
+with col_editor:
+    st.markdown("### ✍️ Markdown Editor")
+    st.text_area(
+        "Write your markdown here:",
+        key="markdown_editor_area",
+        height=650,
+        label_visibility="collapsed",
+        placeholder="Type or paste your Markdown here..."
+    )
+        
+with col_preview:
+    st.markdown("### 👁️ Live Styled Preview")
+    st.components.v1.html(preview_html, height=650, scrolling=True)
 
 # FOOTER REFERENCE GUIDE
 with st.expander("📖 PDF Layout & Page Breaks Guide", expanded=False):
