@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import markdown
 import io
 import os
@@ -6,6 +7,11 @@ import sys
 
 # Import local stylesheet generator
 import styles
+
+# Declare custom workspace component
+parent_dir = os.path.dirname(os.path.abspath(__file__))
+component_dir = os.path.join(parent_dir, "editor_component")
+markdown_workspace = components.declare_component("markdown_workspace", path=component_dir)
 
 # Page setup
 st.set_page_config(
@@ -15,29 +21,114 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Header and element styling
+# Header and element styling with custom typography and premium themes
 st.markdown("""
     <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap');
+    
     .block-container {
         padding-top: 1.5rem !important;
-        padding-bottom: 2.0rem !important;
+        padding-bottom: 1.5rem !important;
+        max-width: 100% !important;
     }
+    
     .main-title {
-        font-family: 'Helvetica Neue', Arial, sans-serif;
-        font-weight: 700;
-        color: #0f172a;
-        margin-bottom: 5px;
+        font-family: 'Outfit', 'Inter', sans-serif;
+        font-weight: 800;
+        font-size: 2.3rem;
+        background: linear-gradient(135deg, #60a5fa 0%, #a78bfa 50%, #f472b6 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 2px;
+        letter-spacing: -0.03em;
     }
+    
     .subtitle {
-        color: #64748b;
-        font-size: 1.1rem;
-        margin-bottom: 20px;
+        font-family: 'Inter', sans-serif;
+        color: #94a3b8;
+        font-size: 1.05rem;
+        margin-bottom: 25px;
     }
-    /* Hide Streamlit sidebar button since we don't use the sidebar */
+    
+    /* Make background deep and clean dark */
+    .stApp {
+        background-color: #0b0f19 !important;
+        color: #f8fafc !important;
+    }
+    
+    /* Premium Glassmorphic Settings Panel */
+    div[data-testid="stBorderedContainer"] {
+        background-color: #111827 !important;
+        border: 1px solid #1f2937 !important;
+        border-radius: 12px !important;
+        padding: 20px 24px !important;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4) !important;
+        margin-bottom: 20px !important;
+    }
+    
+    /* Control headers styling */
+    .control-section-header {
+        font-family: 'Outfit', sans-serif;
+        font-size: 0.9rem;
+        font-weight: 700;
+        color: #94a3b8;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 10px;
+        border-bottom: 1px solid #1f2937;
+        padding-bottom: 6px;
+    }
+    
+    /* Sleek Button Styles */
+    div.stButton > button {
+        background: linear-gradient(135deg, #1f2937 0%, #111827 100%) !important;
+        color: #f8fafc !important;
+        border: 1px solid #374151 !important;
+        border-radius: 8px !important;
+        padding: 6px 14px !important;
+        font-family: 'Inter', sans-serif;
+        font-size: 13px !important;
+        font-weight: 600 !important;
+        transition: all 0.2s ease !important;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2) !important;
+        height: 38px !important;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    div.stButton > button:hover {
+        border-color: #60a5fa !important;
+        color: #60a5fa !important;
+        box-shadow: 0 4px 12px -1px rgba(96, 165, 250, 0.25) !important;
+        transform: translateY(-1px);
+    }
+    
+    /* File uploader styling */
+    div[data-testid="stFileUploader"] {
+        background-color: #111827 !important;
+        border: 1px dashed #374151 !important;
+        border-radius: 8px !important;
+        padding: 6px !important;
+        margin-bottom: 10px !important;
+    }
+    
+    /* Hide Streamlit default components */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
+    
+    h1, h2, h3, h4, h5, h6, p, label {
+        font-family: 'Inter', sans-serif !important;
+    }
+    
+    label[data-testid="stWidgetLabel"] {
+        color: #94a3b8 !important;
+        font-weight: 500 !important;
+        font-size: 13px !important;
+    }
     </style>
 """, unsafe_allow_html=True)
+
 
 # Theme metadata for outer background, paper background, and text colors in the preview
 THEME_METADATA = {
@@ -84,6 +175,8 @@ def handle_file_upload():
 # PDF Generation Function using Playwright (Chromium)
 def generate_pdf_bytes(html_content, page_size, orientation, margins):
     from playwright.sync_api import sync_playwright
+    import subprocess
+    import sys
     
     # Margin formatting for Playwright (Optimized tighter spacing)
     margin_vals = {
@@ -101,7 +194,24 @@ def generate_pdf_bytes(html_content, page_size, orientation, margins):
     """
     
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
+        try:
+            browser = p.chromium.launch(headless=True)
+        except Exception as e:
+            err_msg = str(e)
+            if "Executable doesn't exist" in err_msg or "playwright install" in err_msg.lower() or "looks like playwright was just installed" in err_msg.lower():
+                # Let user know in Streamlit UI we are downloading
+                st.info("Playwright Chromium browser not found. Automatically installing Chromium browser (this may take a minute)...")
+                try:
+                    # Run install command
+                    subprocess.run([sys.executable, "-m", "playwright", "install", "chromium"], check=True)
+                    st.success("Chromium installed successfully! Continuing PDF compilation...")
+                    # Retry launching
+                    browser = p.chromium.launch(headless=True)
+                except Exception as install_err:
+                    raise RuntimeError(f"Failed to auto-install Playwright Chromium: {install_err}") from install_err
+            else:
+                raise
+        
         page = browser.new_page()
         page.set_content(html_content)
         
@@ -236,169 +346,71 @@ if md_text.strip():
     except Exception as e:
         pdf_error = str(e)
 
-# TOP DASHBOARD CONTROLS (Main Page, Column-based Layout)
-st.markdown("### ⚙️ Document Controls & Layout Settings")
-
-col_file, col_style, col_layout = st.columns([1.2, 1, 1])
-
-with col_file:
-    st.markdown("##### 📂 File Operations")
-    uploaded_file = st.file_uploader(
-        "Upload Markdown (.md) File",
-        type=["md", "txt", "markdown"],
-        key="uploaded_file",
-        on_change=handle_file_upload,
-        label_visibility="collapsed"
-    )
+# TOP DASHBOARD CONTROLS (Main Page, Column-based Layout wrapped in premium card container)
+with st.container(border=True):
+    col_file, col_style, col_layout = st.columns([1.2, 1, 1])
     
-    col_btn1, col_btn2 = st.columns(2)
-    with col_btn1:
-        if st.button("🗑️ Clear Editor", use_container_width=True):
-            st.session_state.markdown_editor_area = ""
-            st.rerun()
-    with col_btn2:
-        if not md_text.strip():
-            st.button("⬇️ Download PDF", disabled=True, use_container_width=True, help="Write or upload markdown to export")
-        elif pdf_error is not None:
-            st.button("⚠️ PDF Error", disabled=True, use_container_width=True, help=f"Error compiling PDF: {pdf_error}")
-        else:
-            st.download_button(
-                label="⬇️ Download PDF",
-                data=pdf_bytes,
-                file_name="document.pdf",
-                mime="application/pdf",
-                use_container_width=True
-            )
+    with col_file:
+        st.markdown("<div class='control-section-header'>📂 File Operations</div>", unsafe_allow_html=True)
+        uploaded_file = st.file_uploader(
+            "Upload Markdown (.md) File",
+            type=["md", "txt", "markdown"],
+            key="uploaded_file",
+            on_change=handle_file_upload,
+            label_visibility="collapsed"
+        )
+        
+        col_btn1, col_btn2 = st.columns(2)
+        with col_btn1:
+            if st.button("🗑️ Clear Editor", use_container_width=True):
+                st.session_state.markdown_editor_area = ""
+                st.rerun()
+        with col_btn2:
+            if not md_text.strip():
+                st.button("⬇️ Download PDF", disabled=True, use_container_width=True, help="Write or upload markdown to export")
+            elif pdf_error is not None:
+                st.button("⚠️ PDF Error", disabled=True, use_container_width=True, help=f"Error compiling PDF: {pdf_error}")
+            else:
+                st.download_button(
+                    label="⬇️ Download PDF",
+                    data=pdf_bytes,
+                    file_name="document.pdf",
+                    mime="application/pdf",
+                    use_container_width=True
+                )
 
-with col_style:
-    st.markdown("##### 🎨 Typography & Theme")
-    theme_options = list(styles.THEME_BASES.keys())
-    selected_theme = st.selectbox("Style Theme", theme_options, index=0, key="selected_theme_key")
-    font_size = st.selectbox("Font Size", ["11px", "12px", "13px", "14px", "15px", "16px"], index=3, key="font_size_key")
+    with col_style:
+        st.markdown("<div class='control-section-header'>🎨 Typography & Theme</div>", unsafe_allow_html=True)
+        theme_options = list(styles.THEME_BASES.keys())
+        selected_theme = st.selectbox("Style Theme", theme_options, index=0, key="selected_theme_key")
+        font_size = st.selectbox("Font Size", ["11px", "12px", "13px", "14px", "15px", "16px"], index=3, key="font_size_key")
 
-with col_layout:
-    st.markdown("##### 📐 Page Layout")
-    page_size = st.selectbox("Page Size", ["A4", "Letter", "Legal", "A3", "A5"], index=0, key="page_size_key")
-    orientation = st.radio("Orientation", ["Portrait", "Landscape"], index=0, horizontal=True, key="orientation_key").lower()
-    margins = st.select_slider("Margins", options=["narrow", "normal", "wide"], value="normal", key="margins_key")
+    with col_layout:
+        st.markdown("<div class='control-section-header'>📐 Page Layout</div>", unsafe_allow_html=True)
+        page_size = st.selectbox("Page Size", ["A4", "Letter", "Legal", "A3", "A5"], index=0, key="page_size_key")
+        orientation = st.radio("Orientation", ["Portrait", "Landscape"], index=0, horizontal=True, key="orientation_key").lower()
+        margins = st.select_slider("Margins", options=["narrow", "normal", "wide"], value="normal", key="margins_key")
 
 st.markdown("---")
 
-# Compile Preview HTML
-try:
-    if not md_text.strip():
-        html_body_prev = "<p style='color: #94a3b8; font-style: italic;'>Your rendered PDF preview will appear here...</p>"
-    else:
-        html_body_prev = markdown.markdown(
-            md_text,
-            extensions=['extra', 'toc', 'sane_lists', 'nl2br', 'markdown.extensions.codehilite'],
-            extension_configs={
-                'markdown.extensions.codehilite': {
-                    'guess_lang': False,
-                    'use_pygments': True,
-                    'noclasses': False
-                }
-            }
-        )
-except Exception as e:
-    html_body_prev = f"<p>Error compiling markdown: {e}</p>"
-
+# RENDER CUSTOM WORKSPACE COMPONENT (Unified Editor & Preview)
 theme_css = styles.get_theme_css(selected_theme, pdf_mode=False)
-meta = THEME_METADATA.get(selected_theme, THEME_METADATA["GitHub Light"])
-page_bg = meta["page_bg"]
-outer_bg = meta["outer_bg"]
-text_color = meta["text_color"]
 
-margin_vals = {"narrow": "0.6cm", "normal": "1.2cm", "wide": "2.0cm"}
-margin_str = margin_vals.get(margins, "1.2cm")
+returned_text = markdown_workspace(
+    initial_value=st.session_state.markdown_editor_area,
+    theme_css=theme_css,
+    page_size=page_size,
+    orientation=orientation,
+    margins=margins,
+    font_size=font_size,
+    height=800,
+    key="workspace_editor_preview"
+)
 
-# Compile standalone HTML doc for Preview (Paper Sheet style, responsive)
-preview_html = f"""<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <title>Markdown Preview</title>
-    <style>
-        {theme_css}
-        
-        /* Layout overrides to simulate a physical paper sheet */
-        html, body {{
-            background-color: {outer_bg} !important;
-            margin: 0 !important;
-            padding: 10px !important;
-            display: flex;
-            justify-content: center;
-            box-sizing: border-box;
-        }}
-        
-        .page-container {{
-            background-color: {page_bg} !important;
-            color: {text_color} !important;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
-            border: 1px solid rgba(0, 0, 0, 0.08);
-            padding: {margin_str};
-            width: 100%;
-            max-width: 800px;
-            min-height: 1050px;
-            box-sizing: border-box;
-            border-radius: 4px;
-            text-align: left;
-        }}
-        
-        body {{
-            padding: 0 !important;
-            background: transparent !important;
-            font-size: {font_size} !important;
-        }}
-        
-        h1:first-child, h2:first-child, p:first-child {{
-            margin-top: 0 !important;
-            padding-top: 0 !important;
-        }}
-        
-        table {{
-            width: 100% !important;
-            max-width: 100% !important;
-            table-layout: auto !important;
-            border-collapse: collapse !important;
-            margin-bottom: 1rem !important;
-        }}
-        table td, table th {{
-            word-break: normal !important;
-            word-wrap: break-word !important;
-            overflow-wrap: break-word !important;
-            min-width: 80px !important;
-        }}
-        img {{
-            max-width: 100% !important;
-            height: auto !important;
-        }}
-    </style>
-</head>
-<body>
-    <div class="page-container">
-        {html_body_prev}
-    </div>
-</body>
-</html>
-"""
-
-# MAIN EDITOR & PREVIEW WORKSPACE
-col_editor, col_preview = st.columns([1, 1])
-
-with col_editor:
-    st.markdown("### ✍️ Markdown Editor")
-    st.text_area(
-        "Write your markdown here:",
-        key="markdown_editor_area",
-        height=700,
-        label_visibility="collapsed",
-        placeholder="Type or paste your Markdown here..."
-    )
-        
-with col_preview:
-    st.markdown("### 👁️ Live Styled Preview")
-    st.components.v1.html(preview_html, height=700, scrolling=True)
+# If the text was changed inside Javascript and returned to Streamlit, update state and rerun
+if returned_text is not None and returned_text != st.session_state.markdown_editor_area:
+    st.session_state.markdown_editor_area = returned_text
+    st.rerun()
 
 # FOOTER REFERENCE GUIDE
 with st.expander("📖 PDF Layout & Page Breaks Guide", expanded=False):
