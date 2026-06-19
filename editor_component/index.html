@@ -228,11 +228,13 @@
         .preview-workspace {
             flex: 1;
             overflow-y: auto;
-            padding: 24px;
+            padding: 32px;
             box-sizing: border-box;
-            background-color: #0f172a;
+            background-color: #ffffff;
+            color: #24292f;
             scrollbar-width: thin;
             scrollbar-color: #334155 #0f172a;
+            transition: background-color 0.2s, color 0.2s;
         }
 
         .preview-workspace::-webkit-scrollbar {
@@ -246,41 +248,13 @@
             border-radius: 4px;
         }
 
-        /* Simulated Paper Sheet Container */
-        .paper-sheet {
-            background-color: #ffffff;
-            color: #24292f;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 6px;
-            box-sizing: border-box;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            position: relative;
-            transform-origin: top center;
-        }
-
-        /* Dynamic Aspect Ratios mimicking real paper sizing */
-        .paper-sheet.A4.portrait { width: 100%; max-width: 720px; min-height: 1018px; }
-        .paper-sheet.A4.landscape { width: 100%; max-width: 950px; min-height: 671px; }
-
-        .paper-sheet.Letter.portrait { width: 100%; max-width: 720px; min-height: 932px; }
-        .paper-sheet.Letter.landscape { width: 100%; max-width: 932px; min-height: 720px; }
-
-        .paper-sheet.Legal.portrait { width: 100%; max-width: 720px; min-height: 1186px; }
-        .paper-sheet.Legal.landscape { width: 100%; max-width: 1186px; min-height: 720px; }
-
-        .paper-sheet.A3.portrait { width: 100%; max-width: 850px; min-height: 1202px; }
-        .paper-sheet.A3.landscape { width: 100%; max-width: 1202px; min-height: 850px; }
-
-        .paper-sheet.A5.portrait { width: 100%; max-width: 500px; min-height: 707px; }
-        .paper-sheet.A5.landscape { width: 100%; max-width: 707px; min-height: 500px; }
-
-        /* Render styles inside paper sheet */
+        /* Fluid Preview Content Wrapper (Centered for readability) */
         .paper-content {
             box-sizing: border-box;
             width: 100%;
-            height: 100%;
-            font-size: 14px;
+            max-width: 800px;
+            margin: 0 auto;
+            text-align: left;
         }
 
         .paper-content table {
@@ -308,11 +282,6 @@
         .paper-content p:first-child {
             margin-top: 0 !important;
             padding-top: 0 !important;
-        }
-
-        /* Theme Styling placeholder containers */
-        #dynamic-theme-css {
-            display: none;
         }
 
         /* Empty state placeholder styling */
@@ -402,13 +371,9 @@
                     <button class="view-btn btn-preview" onclick="setViewMode('preview')" title="Focus Preview">👁️ Focus</button>
                 </div>
             </div>
-            <div class="preview-workspace">
-                <div id="paper-wrapper" style="width: 100%; display: flex; justify-content: center; align-items: flex-start; overflow: visible;">
-                    <div id="paper-sheet" class="paper-sheet A4 portrait">
-                        <div id="paper-content" class="paper-content">
-                            <div class="empty-placeholder">Your rendered PDF preview will appear here...</div>
-                        </div>
-                    </div>
+            <div class="preview-workspace" id="preview-workspace">
+                <div id="paper-content" class="paper-content">
+                    <div class="empty-placeholder">Your rendered PDF preview will appear here...</div>
                 </div>
             </div>
         </div>
@@ -420,37 +385,10 @@
         const editor = document.getElementById('editor-input');
         const lineNumbers = document.getElementById('line-numbers');
         const paperContent = document.getElementById('paper-content');
-        const paperSheet = document.getElementById('paper-sheet');
+        const previewWorkspace = document.getElementById('preview-workspace');
         const themeStyle = document.getElementById('dynamic-theme-style');
 
         let lastSentValue = "";
-
-        // Auto-scale preview container to fit workspace width
-        function scalePreview() {
-            const workspace = document.querySelector('.preview-workspace');
-            const sheet = document.getElementById('paper-sheet');
-            const wrapper = document.getElementById('paper-wrapper');
-            if (!sheet || !workspace || !wrapper) return;
-
-            // Reset scale temporarily for baseline measurements
-            sheet.style.transform = 'none';
-            sheet.style.margin = '0 auto';
-
-            const workspaceWidth = workspace.clientWidth - 48; // padding (24px each side)
-            const sheetWidth = sheet.offsetWidth;
-
-            let scale = 1;
-            if (workspaceWidth < sheetWidth && workspaceWidth > 0) {
-                scale = workspaceWidth / sheetWidth;
-            }
-
-            sheet.style.transform = `scale(${scale})`;
-            sheet.style.transformOrigin = 'top center';
-
-            // Set wrapper height to the scaled height of the sheet to ensure correct scrolling bounds
-            const scaledHeight = sheet.offsetHeight * scale;
-            wrapper.style.height = `${scaledHeight}px`;
-        }
 
         // Handle view mode changes (collapse and expand)
         function setViewMode(mode) {
@@ -468,12 +406,7 @@
                     selector.querySelector('.btn-preview').classList.add('active');
                 }
             });
-
-            // Re-evaluate scaling for the new pane size
-            setTimeout(scalePreview, 100);
         }
-
-        window.addEventListener('resize', scalePreview);
 
         // Helper to update line numbers side sidebar
         function updateLineNumbers() {
@@ -556,9 +489,6 @@
             // Sync scrolling of line numbers
             lineNumbers.scrollTop = editor.scrollTop;
 
-            // Update scaling on input
-            scalePreview();
-
             // Debounce reporting back to python to avoid sluggish Streamlit reruns
             clearTimeout(postDebounceTimeout);
             postDebounceTimeout = setTimeout(sendValueToStreamlit, 400);
@@ -596,31 +526,26 @@
 
             // 3. Update theme styling dynamically
             if (args.theme_css) {
-                // Scope the theme CSS using CSS nesting so it only applies inside the paper sheet
-                const scopedCss = `.paper-sheet {\n${args.theme_css.replace(/\\bbody\\b/g, '&')}\n}`;
+                // Scope the theme CSS using CSS nesting so it only applies inside the preview workspace
+                const scopedCss = `.preview-workspace {\n${args.theme_css.replace(/\\bbody\\b/g, '&')}\n}`;
                 themeStyle.innerHTML = scopedCss;
             }
 
-            // 4. Update page size classes, margins, and orientation
-            const size = args.page_size || 'A4';
-            const orientation = args.orientation || 'portrait';
+            // 4. Update margins and font sizing
             const margin = args.margins || 'normal';
             const fontSize = args.font_size || '14px';
-
-            // Reset paper classes
-            paperSheet.className = `paper-sheet ${size} ${orientation}`;
             
-            // Set dynamic padding based on margins selection
+            // Set dynamic padding based on margins selection for the workspace
             const marginPaddings = {
-                'narrow': '0.6cm',
-                'normal': '1.2cm',
-                'wide': '2.0cm'
+                'narrow': '16px',
+                'normal': '32px',
+                'wide': '48px'
             };
-            const paddingVal = marginPaddings[margin] || '1.2cm';
-            paperSheet.style.padding = paddingVal;
+            const paddingVal = marginPaddings[margin] || '32px';
+            previewWorkspace.style.padding = paddingVal;
 
-            // Apply font size directly to paper sheet contents
-            paperSheet.style.fontSize = fontSize;
+            // Apply font size directly to preview contents
+            previewWorkspace.style.fontSize = fontSize;
 
             // Ensure table columns auto-adjust cleanly
             const tables = paperContent.querySelectorAll('table');
@@ -630,9 +555,6 @@
                 table.style.tableLayout = "auto";
                 table.style.borderCollapse = "collapse";
             });
-
-            // Adjust preview scale after layout changes
-            setTimeout(scalePreview, 50);
         });
     </script>
 </body>
