@@ -21,6 +21,13 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
+def log_debug(msg):
+    try:
+        with open("debug.log", "a", encoding="utf-8") as f:
+            f.write(msg + "\n")
+    except:
+        pass
+
 # Header and element styling with custom typography and premium themes
 st.markdown("""
     <style>
@@ -162,14 +169,22 @@ THEME_METADATA = {
 # Initialize session state for editor content directly
 if 'markdown_editor_area' not in st.session_state:
     st.session_state.markdown_editor_area = ""
+if 'value_id' not in st.session_state:
+    st.session_state.value_id = 0
 
 # Callback for file upload to update editor state directly
 def handle_file_upload():
     if st.session_state.uploaded_file is not None:
         try:
             uploaded_bytes = st.session_state.uploaded_file.read()
-            st.session_state.markdown_editor_area = uploaded_bytes.decode("utf-8")
+            text = uploaded_bytes.decode("utf-8")
+            st.session_state.markdown_editor_area = text
+            st.session_state.value_id += 1
+            log_debug(f"DEBUG: Uploaded file read successfully. Length: {len(text)}, version: {st.session_state.value_id}")
+            with open("uploaded_doc.md", "w", encoding="utf-8") as f:
+                f.write(text)
         except Exception as e:
+            log_debug(f"DEBUG ERROR: {e}")
             st.error(f"Error reading file: {e}")
 
 # PDF Generation Function using Playwright (Chromium)
@@ -235,8 +250,67 @@ def generate_pdf_bytes(html_content, page_size, orientation, margins):
         browser.close()
         return pdf_data
 
+def preprocess_markdown_tables(md_text):
+    if not md_text:
+        return ""
+    lines = md_text.split('\n')
+    processed_lines = []
+    
+    # Pass 1: Skip blank lines between consecutive table rows
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        is_table_row = stripped.startswith('|') and stripped.endswith('|') and len(stripped) > 1
+        
+        if stripped == "" and i > 0 and i < len(lines) - 1:
+            prev_stripped = lines[i-1].strip()
+            next_stripped = lines[i+1].strip()
+            prev_is_row = prev_stripped.startswith('|') and prev_stripped.endswith('|') and len(prev_stripped) > 1
+            next_is_row = next_stripped.startswith('|') and next_stripped.endswith('|') and len(next_stripped) > 1
+            if prev_is_row and next_is_row:
+                continue
+        processed_lines.append(line)
+        
+    # Pass 2: Insert separators for tables missing them
+    final_lines = []
+    in_table = False
+    table_has_separator = False
+    first_row_index = -1
+    cols_count = 0
+    
+    for line in processed_lines:
+        stripped = line.strip()
+        is_table_row = stripped.startswith('|') and stripped.endswith('|') and len(stripped) > 1
+        
+        if is_table_row:
+            is_separator = all(c in '|- :*' for c in stripped) and '-' in stripped
+            if not in_table:
+                in_table = True
+                table_has_separator = is_separator
+                cols_count = stripped.count('|') - 1
+                first_row_index = len(final_lines)
+                final_lines.append(line)
+            else:
+                if is_separator:
+                    table_has_separator = True
+                final_lines.append(line)
+        else:
+            if in_table and not table_has_separator and cols_count > 0:
+                sep_line = "|" + " --- |" * cols_count
+                final_lines.insert(first_row_index + 1, sep_line)
+            
+            in_table = False
+            table_has_separator = False
+            cols_count = 0
+            final_lines.append(line)
+            
+    if in_table and not table_has_separator and cols_count > 0:
+        sep_line = "|" + " --- |" * cols_count
+        final_lines.insert(first_row_index + 1, sep_line)
+        
+    return '\n'.join(final_lines)
+
 # Application title
-st.markdown("<h1 class='main-title'>📝 Markdown to PDF Converter Pro</h1>", unsafe_allow_html=True)
+st.markdown("<h1 class='main-title'>Markdown to PDF Converter Pro</h1>", unsafe_allow_html=True)
 st.markdown("<p class='subtitle'>Write or upload Markdown, customize layout settings, and download your styled PDF document.</p>", unsafe_allow_html=True)
 
 # Retrieve the current markdown text directly from the editor's state key
@@ -248,8 +322,9 @@ pdf_error = None
 if md_text.strip():
     try:
         # 1. Compile Markdown HTML
+        preprocessed_text = preprocess_markdown_tables(md_text)
         html_body = markdown.markdown(
-            md_text,
+            preprocessed_text,
             extensions=['extra', 'toc', 'sane_lists', 'nl2br', 'markdown.extensions.codehilite'],
             extension_configs={
                 'markdown.extensions.codehilite': {
@@ -364,12 +439,13 @@ with st.container(border=True):
         with col_btn1:
             if st.button("🗑️ Clear Editor", use_container_width=True):
                 st.session_state.markdown_editor_area = ""
+                st.session_state.value_id += 1
                 st.rerun()
         with col_btn2:
             if not md_text.strip():
-                st.button("⬇️ Download PDF", disabled=True, use_container_width=True, help="Write or upload markdown to export")
+                st.button("⬇ Download PDF", disabled=True, use_container_width=True, help="Write or upload markdown to export")
             elif pdf_error is not None:
-                st.button("⚠️ PDF Error", disabled=True, use_container_width=True, help=f"Error compiling PDF: {pdf_error}")
+                st.button("PDF Error", disabled=True, use_container_width=True, help=f"Error compiling PDF: {pdf_error}")
             else:
                 st.download_button(
                     label="⬇️ Download PDF",
@@ -396,8 +472,11 @@ st.markdown("---")
 # RENDER CUSTOM WORKSPACE COMPONENT (Unified Editor & Live Preview with dynamic View Mode controls)
 theme_css = styles.get_theme_css(selected_theme, pdf_mode=False)
 
-returned_text = markdown_workspace(
+log_debug(f"DEBUG: Rendering component key workspace_editor_preview, value length: {len(st.session_state.markdown_editor_area)}, value_id: {st.session_state.value_id}")
+log_debug(f"DEBUG: Markdown content preview:\n{st.session_state.markdown_editor_area[:2000]}\n--- END PREVIEW ---")
+returned_data = markdown_workspace(
     initial_value=st.session_state.markdown_editor_area,
+    value_id=st.session_state.value_id,
     theme_css=theme_css,
     page_size=page_size,
     orientation=orientation,
@@ -408,12 +487,15 @@ returned_text = markdown_workspace(
 )
 
 # If the text was changed inside Javascript and returned to Streamlit, update state and rerun
-if returned_text is not None and returned_text != st.session_state.markdown_editor_area:
-    st.session_state.markdown_editor_area = returned_text
-    st.rerun()
+if returned_data is not None and isinstance(returned_data, dict):
+    if returned_data.get("value_id") == st.session_state.value_id:
+        new_text = returned_data.get("value")
+        if new_text != st.session_state.markdown_editor_area:
+            st.session_state.markdown_editor_area = new_text
+            st.rerun()
 
 # FOOTER REFERENCE GUIDE
-with st.expander("📖 PDF Layout & Page Breaks Guide", expanded=False):
+with st.expander("PDF Layout & Page Breaks Guide", expanded=False):
     st.markdown("""
     #### Page Breaks in PDF
     To split your PDF document into multiple pages, use this exact HTML snippet:

@@ -36,7 +36,8 @@
       if (!isReady) {
         window.parent.postMessage({
           isStreamlitMessage: true,
-          type: "streamlit:setComponentReady"
+          type: "streamlit:componentReady",
+          apiVersion: 1
         }, "*");
         isReady = true;
       }

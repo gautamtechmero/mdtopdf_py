@@ -387,8 +387,8 @@
         const paperContent = document.getElementById('paper-content');
         const previewWorkspace = document.getElementById('preview-workspace');
         const themeStyle = document.getElementById('dynamic-theme-style');
-
         let lastSentValue = "";
+        let currentValueId = 0;
 
         // Handle view mode changes (collapse and expand)
         function setViewMode(mode) {
@@ -434,6 +434,76 @@
             headerIds: false
         });
 
+        function preprocessMarkdownTables(mdText) {
+            if (!mdText) return "";
+            const lines = mdText.split('\n');
+            const processedLines = [];
+            
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                const stripped = line.trim();
+                
+                if (stripped === "" && i > 0 && i < lines.length - 1) {
+                    const prevStripped = lines[i-1].trim();
+                    const nextStripped = lines[i+1].trim();
+                    const prevIsRow = prevStripped.startsWith('|') && prevStripped.endsWith('|') && prevStripped.length > 1;
+                    const nextIsRow = nextStripped.startsWith('|') && nextStripped.endsWith('|') && nextStripped.length > 1;
+                    if (prevIsRow && nextIsRow) {
+                        continue;
+                    }
+                }
+                processedLines.push(line);
+            }
+            
+            const finalLines = [];
+            let inTable = false;
+            let tableHasSeparator = false;
+            let firstRowIndex = -1;
+            let colsCount = 0;
+            
+            for (let i = 0; i < processedLines.length; i++) {
+                const line = processedLines[i];
+                const stripped = line.trim();
+                const isTableRow = stripped.startsWith('|') && stripped.endsWith('|') && stripped.length > 1;
+                
+                if (isTableRow) {
+                    const isSeparator = stripped.split('|').slice(1, -1).every(cell => {
+                        const cellStr = cell.trim();
+                        return cellStr.replace(/[- :*]/g, '') === '';
+                    }) && stripped.includes('-');
+                    
+                    if (!inTable) {
+                        inTable = true;
+                        tableHasSeparator = isSeparator;
+                        colsCount = (stripped.match(/\|/g) || []).length - 1;
+                        firstRowIndex = finalLines.length;
+                        finalLines.push(line);
+                    } else {
+                        if (isSeparator) {
+                            tableHasSeparator = true;
+                        }
+                        finalLines.push(line);
+                    }
+                } else {
+                    if (inTable && !tableHasSeparator && colsCount > 0) {
+                        const sepLine = "|" + " --- |".repeat(colsCount);
+                        finalLines.splice(firstRowIndex + 1, 0, sepLine);
+                    }
+                    inTable = false;
+                    tableHasSeparator = false;
+                    colsCount = 0;
+                    finalLines.push(line);
+                }
+            }
+            
+            if (inTable && !tableHasSeparator && colsCount > 0) {
+                const sepLine = "|" + " --- |".repeat(colsCount);
+                finalLines.splice(firstRowIndex + 1, 0, sepLine);
+            }
+            
+            return finalLines.join('\n');
+        }
+
         // Parse and render Markdown to preview pane
         function renderMarkdown() {
             const text = editor.value;
@@ -442,8 +512,9 @@
                 return;
             }
             try {
+                const preprocessedText = preprocessMarkdownTables(text);
                 // Parse markdown using marked.js
-                paperContent.innerHTML = marked.parse(text);
+                paperContent.innerHTML = marked.parse(preprocessedText);
             } catch (e) {
                 paperContent.innerHTML = `<div style="color: red; padding: 20px;">Markdown Parsing Error: ${e.message}</div>`;
             }
@@ -478,7 +549,10 @@
             const currentValue = editor.value;
             if (currentValue !== lastSentValue) {
                 lastSentValue = currentValue;
-                Streamlit.setComponentValue(currentValue);
+                Streamlit.setComponentValue({
+                    value: currentValue,
+                    value_id: currentValueId
+                });
             }
         }
 
@@ -509,10 +583,20 @@
             if (!args) return;
 
             // 1. Check for incoming text updates (from file uploads, reset buttons, etc.)
-            if (args.initial_value !== undefined && args.initial_value !== editor.value) {
-                // If it's a completely fresh start or a clear event
+            if (args.value_id !== undefined && args.value_id !== currentValueId) {
+                currentValueId = args.value_id;
+                editor.value = args.initial_value || "";
+                lastSentValue = editor.value;
+                renderMarkdown();
+                updateLineNumbers();
+                // Send the value back immediately to align Streamlit state
+                Streamlit.setComponentValue({
+                    value: editor.value,
+                    value_id: currentValueId
+                });
+            } else if (args.initial_value !== undefined && editor.value === "") {
                 editor.value = args.initial_value;
-                lastSentValue = args.initial_value;
+                lastSentValue = editor.value;
                 renderMarkdown();
                 updateLineNumbers();
             }
@@ -527,7 +611,7 @@
             // 3. Update theme styling dynamically
             if (args.theme_css) {
                 // Scope the theme CSS using CSS nesting so it only applies inside the preview workspace
-                const scopedCss = `.preview-workspace {\n${args.theme_css.replace(/\\bbody\\b/g, '&')}\n}`;
+                const scopedCss = `.preview-workspace {\n${args.theme_css.replace(/\bbody\b/g, '&')}\n}`;
                 themeStyle.innerHTML = scopedCss;
             }
 
