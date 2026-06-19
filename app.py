@@ -39,6 +39,35 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# Theme metadata for outer background, paper background, and text colors in the preview
+THEME_METADATA = {
+    "GitHub Light": {
+        "page_bg": "#ffffff",
+        "outer_bg": "#f1f5f9",
+        "text_color": "#24292f"
+    },
+    "GitHub Dark": {
+        "page_bg": "#0d1117",
+        "outer_bg": "#030712",
+        "text_color": "#c9d1d9"
+    },
+    "Academic / Formal": {
+        "page_bg": "#fdfdfd",
+        "outer_bg": "#f1f5f9",
+        "text_color": "#111111"
+    },
+    "Sleek Modern": {
+        "page_bg": "#f8fafc",
+        "outer_bg": "#e2e8f0",
+        "text_color": "#334155"
+    },
+    "Minimalist": {
+        "page_bg": "#ffffff",
+        "outer_bg": "#f8fafc",
+        "text_color": "#111111"
+    }
+}
+
 # Initialize session state for editor content directly
 if 'markdown_editor_area' not in st.session_state:
     st.session_state.markdown_editor_area = ""
@@ -153,7 +182,13 @@ except Exception as e:
 # Retrieve appropriate CSS theme styles
 theme_css = styles.get_theme_css(selected_theme, pdf_mode=False)
 
-# Compile standalone HTML doc for Preview & PDF renderer
+# Fetch theme metadata for paper layout
+meta = THEME_METADATA.get(selected_theme, THEME_METADATA["GitHub Light"])
+page_bg = meta["page_bg"]
+outer_bg = meta["outer_bg"]
+text_color = meta["text_color"]
+
+# Compile standalone HTML doc for Preview (Paper Sheet style, responsive)
 preview_html = f"""<!DOCTYPE html>
 <html>
 <head>
@@ -161,14 +196,61 @@ preview_html = f"""<!DOCTYPE html>
     <title>Markdown Preview</title>
     <style>
         {theme_css}
+        
+        /* Layout overrides to simulate a physical paper sheet */
+        html, body {{
+            background-color: {outer_bg} !important;
+            margin: 0 !important;
+            padding: 15px !important;
+            display: flex;
+            justify-content: center;
+            box-sizing: border-box;
+        }}
+        
+        .page-container {{
+            background-color: {page_bg} !important;
+            color: {text_color} !important;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            padding: 1.5cm;
+            width: 100%;
+            max-width: 800px;
+            min-height: 1050px; /* A4 aspect ratio representation */
+            box-sizing: border-box;
+            border-radius: 4px;
+            text-align: left;
+        }}
+        
+        /* Force body rules to apply nicely inside the container instead */
+        body {{
+            padding: 0 !important;
+            background: transparent !important;
+        }}
+        
+        /* Responsive table wrapping */
+        table {{
+            width: 100% !important;
+            table-layout: auto !important;
+        }}
+        table td, table th {{
+            word-break: break-word !important;
+            max-width: 250px;
+        }}
+        img {{
+            max-width: 100% !important;
+            height: auto !important;
+        }}
     </style>
 </head>
 <body>
-    {html_body}
+    <div class="page-container">
+        {html_body}
+    </div>
 </body>
 </html>
 """
 
+# Compile standard HTML doc for PDF compiler (without outer borders, using real print styling)
 pdf_html = f"""<!DOCTYPE html>
 <html>
 <head>
@@ -188,6 +270,20 @@ pdf_html = f"""<!DOCTYPE html>
         }}
         body {{
             word-wrap: break-word;
+        }}
+        
+        /* Ensure table text wraps correctly in the printed PDF */
+        table {{
+            width: 100% !important;
+            table-layout: auto !important;
+            border-collapse: collapse;
+        }}
+        table td, table th {{
+            word-break: break-word !important;
+        }}
+        img {{
+            max-width: 100% !important;
+            height: auto !important;
         }}
     </style>
 </head>
@@ -234,14 +330,14 @@ with col_editor:
     st.text_area(
         "Write your markdown here:",
         key="markdown_editor_area",
-        height=650,
+        height=700,
         label_visibility="collapsed",
         placeholder="Type or paste your Markdown here..."
     )
         
 with col_preview:
     st.markdown("### 👁️ Live Styled Preview")
-    st.components.v1.html(preview_html, height=650, scrolling=True)
+    st.components.v1.html(preview_html, height=700, scrolling=True)
 
 # FOOTER REFERENCE GUIDE
 with st.expander("📖 PDF Layout & Page Breaks Guide", expanded=False):
