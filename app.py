@@ -85,13 +85,13 @@ def handle_file_upload():
 def generate_pdf_bytes(html_content, page_size, orientation, margins):
     from playwright.sync_api import sync_playwright
     
-    # Margin formatting for Playwright
+    # Margin formatting for Playwright (Optimized tighter spacing)
     margin_vals = {
-        "narrow": "1.0cm",
-        "normal": "2.0cm",
-        "wide": "3.0cm"
+        "narrow": "0.6cm",
+        "normal": "1.2cm",
+        "wide": "2.0cm"
     }
-    margin_str = margin_vals.get(margins, "2.0cm")
+    margin_str = margin_vals.get(margins, "1.2cm")
     
     # Chromium footer template containing native page numbers
     footer_html = f"""
@@ -229,6 +229,12 @@ preview_html = f"""<!DOCTYPE html>
             font-size: {font_size} !important;
         }}
         
+        /* Strip top margins on preview header to align it to the paper top edge */
+        h1:first-child, h2:first-child, p:first-child {{
+            margin-top: 0 !important;
+            padding-top: 0 !important;
+        }}
+        
         /* Responsive table wrapping */
         table {{
             width: 100% !important;
@@ -273,6 +279,14 @@ pdf_html = f"""<!DOCTYPE html>
         body {{
             word-wrap: break-word;
             font-size: {font_size} !important;
+            padding-top: 0 !important; /* Strip default body top padding in PDF */
+            margin-top: 0 !important;
+        }}
+        
+        /* Strip top margin on the first header in the PDF page */
+        h1:first-child, h2:first-child, p:first-child {{
+            margin-top: 0 !important;
+            padding-top: 0 !important;
         }}
         
         /* Ensure table text wraps correctly in the printed PDF */
