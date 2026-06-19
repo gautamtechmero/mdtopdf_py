@@ -33,13 +33,6 @@ st.markdown("""
         font-size: 1.1rem;
         margin-bottom: 20px;
     }
-    .control-box {
-        background-color: #f8fafc;
-        padding: 20px;
-        border-radius: 8px;
-        border: 1px solid #e2e8f0;
-        margin-bottom: 20px;
-    }
     /* Hide Streamlit sidebar button since we don't use the sidebar */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
@@ -55,23 +48,57 @@ def handle_file_upload():
     if st.session_state.uploaded_file is not None:
         try:
             uploaded_bytes = st.session_state.uploaded_file.read()
-            # Decode file contents to string and store directly in the text area's state key
             st.session_state.markdown_editor_area = uploaded_bytes.decode("utf-8")
         except Exception as e:
             st.error(f"Error reading file: {e}")
 
-# PDF Generation Function
-def generate_pdf_bytes(html_content):
-    pdf_buffer = io.BytesIO()
-    from xhtml2pdf import pisa
-    pisa_status = pisa.CreatePDF(html_content, dest=pdf_buffer)
-    if pisa_status.err:
-        raise Exception(f"xhtml2pdf generation failed with error code: {pisa_status.err}")
-    return pdf_buffer.getvalue()
+# PDF Generation Function using Playwright (Chromium)
+def generate_pdf_bytes(html_content, page_size, orientation, margins):
+    from playwright.sync_api import sync_playwright
+    
+    # Margin formatting for Playwright
+    margin_vals = {
+        "narrow": "1.0cm",
+        "normal": "2.0cm",
+        "wide": "3.0cm"
+    }
+    margin_str = margin_vals.get(margins, "2.0cm")
+    
+    # Chromium footer template containing native page numbers
+    footer_html = f"""
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 8px; color: #888888; width: 100%; text-align: right; padding-right: {margin_str}; box-sizing: border-box;">
+        Page <span class="pageNumber"></span> of <span class="totalPages"></span>
+    </div>
+    """
+    
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+        page.set_content(html_content)
+        
+        landscape_bool = (orientation == 'landscape')
+        
+        # Print page to PDF bytes
+        pdf_data = page.pdf(
+            format=page_size,
+            landscape=landscape_bool,
+            print_background=True,
+            display_header_footer=True,
+            header_template="<span></span>", # Empty header
+            footer_template=footer_html,
+            margin={
+                "top": margin_str,
+                "bottom": margin_str,
+                "left": margin_str,
+                "right": margin_str
+            }
+        )
+        browser.close()
+        return pdf_data
 
 # Application title
 st.markdown("<h1 class='main-title'>📝 Markdown to PDF Converter Pro</h1>", unsafe_allow_html=True)
-st.markdown("<p class='subtitle'>Write Markdown in the editor, customize settings, and instantly download a styled PDF document.</p>", unsafe_allow_html=True)
+st.markdown("<p class='subtitle'>Write or upload Markdown, customize style theme and PDF layout settings, and download your document.</p>", unsafe_allow_html=True)
 
 # TOP DASHBOARD CONTROLS (Main Page, Column-based Layout)
 st.markdown("### ⚙️ Document Controls & Layout Settings")
@@ -94,7 +121,6 @@ with col_upload:
 
 with col_settings:
     st.markdown("##### 🎨 Styling & Margins")
-    
     col_theme, col_params = st.columns(2)
     
     with col_theme:
@@ -113,9 +139,8 @@ md_text = st.session_state.markdown_editor_area
 
 # Generate HTML body from markdown
 try:
-    # If the text is empty, display a placeholder to keep preview clean
     if not md_text.strip():
-        html_body = "<p style='color: #94a3b8; font-style: italic;'>Your rendered PDF preview will appear here...</p>"
+        html_body = ""
     else:
         html_body = markdown.markdown(
             md_text,
@@ -125,49 +150,34 @@ except Exception as e:
     st.error(f"Markdown compilation error: {e}")
     html_body = f"<p>Error compiling markdown: {e}</p>"
 
-# Retrieve appropriate CSS stylesheets
-theme_css = styles.get_theme_css(
-    selected_theme,
-    pdf_mode=False
-)
+# Retrieve appropriate CSS theme styles
+theme_css = styles.get_theme_css(selected_theme, pdf_mode=False)
 
-preview_html = f"""<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <title>Markdown Preview</title>
-    <style>
-        {theme_css}
-    </style>
-</head>
-<body>
-    {html_body}
-</body>
-</html>
-"""
-
-pdf_css = styles.get_theme_css(
-    selected_theme,
-    pdf_mode=True,
-    page_size=page_size,
-    orientation=orientation,
-    margins=margins
-)
-
+# Compile standalone HTML doc for PDF renderer
 pdf_html = f"""<!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8">
     <title>Exported PDF</title>
     <style>
-        {pdf_css}
+        {theme_css}
+        
+        /* standard print page-breaks and wrapping */
+        .page-break {{
+            page-break-before: always;
+            break-before: page;
+        }}
+        pre, blockquote, table, tr {{
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }}
+        body {{
+            word-wrap: break-word;
+        }}
     </style>
 </head>
 <body>
     {html_body}
-    <div id="footer_content">
-        Page <pdf:pagenumber/> of <pdf:pagecount/>
-    </div>
 </body>
 </html>
 """
@@ -179,11 +189,11 @@ pdf_error = None
 # Only compile PDF if there is content in the editor
 if md_text.strip():
     try:
-        pdf_bytes = generate_pdf_bytes(pdf_html)
+        pdf_bytes = generate_pdf_bytes(pdf_html, page_size, orientation, margins)
     except Exception as e:
         pdf_error = str(e)
 
-# Render a prominent PDF download button at the top
+# Render a prominent PDF download button
 st.markdown("### 💾 Export Document")
 if not md_text.strip():
     st.info("Write or upload markdown below to enable PDF export.")
@@ -201,23 +211,15 @@ else:
 
 st.markdown("---")
 
-# MAIN EDITOR & PREVIEW WORKSPACE
-col_editor, col_preview = st.columns([1, 1])
-
-with col_editor:
-    st.markdown("### ✍️ Markdown Editor")
-    # Text area binds directly to markdown_editor_area in session state
-    st.text_area(
-        "Write your markdown here:",
-        key="markdown_editor_area",
-        height=650,
-        label_visibility="collapsed",
-        placeholder="Type or paste your Markdown here..."
-    )
-        
-with col_preview:
-    st.markdown("### 👁️ Live Styled Preview")
-    st.components.v1.html(preview_html, height=650, scrolling=True)
+# MAIN EDITOR WORKSPACE (Full Width)
+st.markdown("### ✍️ Markdown Editor")
+st.text_area(
+    "Write your markdown here:",
+    key="markdown_editor_area",
+    height=600,
+    label_visibility="collapsed",
+    placeholder="Type or paste your Markdown here..."
+)
 
 # FOOTER REFERENCE GUIDE
 with st.expander("📖 PDF Layout & Page Breaks Guide", expanded=False):
