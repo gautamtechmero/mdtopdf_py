@@ -172,9 +172,23 @@ try:
     if not md_text.strip():
         html_body = "<p style='color: #94a3b8; font-style: italic;'>Your rendered PDF preview will appear here...</p>"
     else:
+        # Configure codehilite extension to disable language guessing for unlabelled code blocks
         html_body = markdown.markdown(
             md_text,
-            extensions=['extra', 'codehilite', 'toc', 'sane_lists', 'nl2br']
+            extensions=[
+                'extra',
+                'toc',
+                'sane_lists',
+                'nl2br',
+                'markdown.extensions.codehilite'
+            ],
+            extension_configs={
+                'markdown.extensions.codehilite': {
+                    'guess_lang': False,
+                    'use_pygments': True,
+                    'noclasses': False
+                }
+            }
         )
 except Exception as e:
     st.error(f"Markdown compilation error: {e}")
@@ -301,6 +315,12 @@ pdf_html = f"""<!DOCTYPE html>
         h1, h2, h3, h4, h5, h6 {{
             page-break-after: avoid !important;
             break-after: avoid !important;
+        }}
+        
+        /* Prevent headings from separating from their sibling content */
+        h1 + *, h2 + *, h3 + *, h4 + *, h5 + *, h6 + * {{
+            page-break-before: avoid !important;
+            break-before: avoid !important;
         }}
         
         pre, blockquote, table, tr, li {{
