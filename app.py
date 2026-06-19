@@ -235,9 +235,9 @@ preview_html = f"""<!DOCTYPE html>
             padding-top: 0 !important;
         }}
         
-        /* Responsive table wrapping & auto-width */
+        /* Responsive table wrapping & full-width (w-fill) */
         table {{
-            width: auto !important;
+            width: 100% !important;
             max-width: 100% !important;
             table-layout: auto !important;
             border-collapse: collapse !important;
@@ -245,7 +245,6 @@ preview_html = f"""<!DOCTYPE html>
         }}
         table td, table th {{
             word-break: break-word !important;
-            max-width: 250px;
         }}
         img {{
             max-width: 100% !important;
@@ -325,9 +324,9 @@ pdf_html = f"""<!DOCTYPE html>
             padding-top: 0 !important;
         }}
         
-        /* Ensure table is auto-width and responsive in the printed PDF */
+        /* Ensure table fills full width and columns are responsive in the printed PDF */
         table {{
-            width: auto !important;
+            width: 100% !important;
             max-width: 100% !important;
             table-layout: auto !important;
             border-collapse: collapse !important;
